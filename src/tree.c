@@ -68,46 +68,45 @@ void reb_tree_add_particle_to_tree(struct reb_simulation* const r, int pt){
 	}
 	struct reb_particle p = r->particles[pt];
 	int rootbox = reb_get_rootbox_for_particle(r, p);
-    //printf("Rootbox: %d", rootbox);
+    
 #ifdef MPI
 	// Do not add particles that do not belong to this tree (avoid removing active particles)
 	int N_root_per_node = r->N_root/r->mpi_num;
 	int proc_id = rootbox/N_root_per_node;
 	if (proc_id!=r->mpi_id) return;
 #endif 	// MPI
-	r->tree_root[rootbox] = reb_tree_add_particle_to_cell(r, r->tree_root[rootbox],pt,NULL,0); // what is rootbox?? why is it 2 sometimes??
-    //printf("%f\n", r->root_size);
+    if (r->tree_root[rootbox] == NULL) {
+        reb_simulation_error(r, "Rootbox is NULL!\n");
+    }
+    r->tree_root[rootbox] = reb_tree_add_particle_to_cell(r, r->tree_root[rootbox],pt,NULL,0);
+
 }
-//Does this run N times, in each timestep?
+
 static struct reb_treecell *reb_tree_add_particle_to_cell(struct reb_simulation* const r, struct reb_treecell *node, int pt, struct reb_treecell *parent, int o){
 	struct reb_particle* const particles = r->particles;
     const struct reb_vec3d boxsize = r->boxsize;
     const double OMEGA = r->ri_sei.OMEGA;
 
-    
 	// Initialize a new node
 	if (node == NULL) {  
         node = calloc(1, sizeof(struct reb_treecell));
 		struct reb_particle p = particles[pt];
         
         const double q = r->ri_sei.Q_NL; // Nonlinearity parameter, 0 < q < 1
+        const double Rx_t = r->root_size*(1-q*cos(OMEGA*r->t));
         const double Lx_t = boxsize.x*(1-q*cos(OMEGA*r->t));
-
+        
 		if (parent == NULL){ // The new node is a root
-			node->w = Lx_t;
+			node->w = Rx_t;
             node->l = r->root_size;
 
-            //... 
-			int i = ((int)floor((p.x + r->boxsize.x/2.)/r->root_size))%r->N_root_x;
+			int i = ((int)floor((p.x + Lx_t/2.)/Rx_t))%r->N_root_x;
 			int j = ((int)floor((p.y + r->boxsize.y/2.)/r->root_size))%r->N_root_y;
 			int k = ((int)floor((p.z + r->boxsize.z/2.)/r->root_size))%r->N_root_z;
-            //printf("i: %d\n", i);
-			node->x = -r->boxsize.x/2.+r->root_size*(0.5+(double)i);
+            
+			node->x = -node->w/2.+Rx_t*(0.5+(double)i);
 			node->y = -r->boxsize.y/2.+r->root_size*(0.5+(double)j);
 			node->z = -r->boxsize.z/2.+r->root_size*(0.5+(double)k);
-            printf("boxsize.x: %f\n", boxsize.x);
-            printf("boxsize.y: %f\n", boxsize.y);
-            printf("boxsize.z: %f\n", boxsize.z);
 
 		}else{ // The new node is a normal node
 			node->w 	= parent->w/2.;
@@ -188,12 +187,18 @@ static struct reb_treecell *reb_simulation_update_tree_cell(struct reb_simulatio
     const double OMEGA = r->ri_sei.OMEGA;
     const double q = r->ri_sei.Q_NL; // Nonlinearity parameter, 0 < q < 1
     const double Lx_t = boxsize.x*(1-q*cos(OMEGA*r->t));
-
+    const double Rx_t = r->root_size*(1-q*cos(OMEGA*r->t));
+    int num_rootboxes = r->N_root_x*r->N_root_y*r->N_root_z;
+    int is_rootbox = 1;
     
-    for (int i = 0; i < sizeof(r->tree_root) / sizeof(struct reb_treecell*); i++) {    
-        if (node == r->tree_root[i] && r->tree_root[i]->w != Lx_t) {
-            node->w = Lx_t;
-            //printf("Chaning the rootbox's size!");
+    for (int i = 0; i < num_rootboxes; i++) {    
+        if (node == r->tree_root[i] && r->tree_root[i]->w != Rx_t) {
+            node->w = Rx_t;
+            if (i % 2 == 0) {
+                node->x = node->w / 2;
+            } else {
+                node->x = -1*node->w / 2;
+            }
         }
     }
 

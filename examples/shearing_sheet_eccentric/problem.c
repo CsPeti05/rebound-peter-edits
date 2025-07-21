@@ -47,14 +47,14 @@ int main(int argc, char* argv[]) {
     double particle_radius_min     = 1;       // m
     double particle_radius_max     = 4;       // m
     double particle_radius_slope   = -3;    
-    double boxsize                 = 50;         // m
+    double boxsize                 = 100;         // m
     if (argc>1){                              // Try to read boxsize from command line
         boxsize = atof(argv[1]);
     }
     printf("Boxsize: %f\n", boxsize);
-    reb_simulation_configure_box(r, boxsize, 1, 1, 1);
-    r->N_ghost_x = 0;
-    r->N_ghost_y = 0;
+    reb_simulation_configure_box(r, boxsize, 2, 2, 1);
+    r->N_ghost_x = 2;
+    r->N_ghost_y = 2;
     r->N_ghost_z = 0;
     
     // Initial conditions
@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
     double total_mass = surfacedensity*r->boxsize.x*r->boxsize.y;
     double mass = 0;
     
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
         struct reb_particle pt;
         double x_0 = reb_random_uniform(r, -r->boxsize.x / 2., r->boxsize.x / 2.);
         double y_0 = reb_random_uniform(r, -r->boxsize.y / 2., r->boxsize.y / 2.);
@@ -92,8 +92,7 @@ int main(int argc, char* argv[]) {
         
     }
     /*
-    
-    while(mass<total_mass){
+    while(mass<total_mass) {
         struct reb_particle pt;
         double x_0 = reb_random_uniform(r, -r->boxsize.x / 2., r->boxsize.x / 2.);
         double y_0 = reb_random_uniform(r, -r->boxsize.y / 2., r->boxsize.y / 2.);
@@ -114,7 +113,6 @@ int main(int argc, char* argv[]) {
         reb_simulation_add(r, pt);
         mass += particle_mass;
     }
-    
     */
     
 
